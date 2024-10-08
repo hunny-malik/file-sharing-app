@@ -34,9 +34,12 @@ def Send():
         s.listen(1)
         print(host)
         conn, addr = s.accept()
-        file = open(filename, 'rb')
-        file_data = file.read(1024)
-        conn.send(file_data)
+        with open(filename, 'rb') as file:
+            file_data = file.read(1024)
+            while file_data:
+                conn.send(file_data)  # Continuously send file data in chunks
+                file_data = file.read(1024)
+        conn.close()
 
 
 
@@ -75,10 +78,13 @@ def Receive():
         s = socket.socket()
         port = 8080
         s.connect((ID, port))
-        file = open(filename1, 'wb')
-        file_data = s.recv(1024)
-        file.write(file_data)
-        file.close()
+        with open(filename1, 'wb') as file:
+            while True:
+                file_data = s.recv(1024)
+                if not file_data:  # If no more data is received, stop reading
+                    break
+                file.write(file_data)
+        s.close()
 
 
     image_icon2 = PhotoImage(file = 'Images/receive.png')
