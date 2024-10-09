@@ -37,7 +37,7 @@ def Send():
         with open(filename, 'rb') as file:
             file_data = file.read(1024)
             while file_data:
-                conn.send(file_data)  # Continuously send file data in chunks
+                conn.send(file_data) 
                 file_data = file.read(1024)
         conn.close()
 
@@ -81,7 +81,7 @@ def Receive():
         with open(filename1, 'wb') as file:
             while True:
                 file_data = s.recv(1024)
-                if not file_data:  # If no more data is received, stop reading
+                if not file_data: 
                     break
                 file.write(file_data)
         s.close()
@@ -144,7 +144,7 @@ Label(root, text = 'Receive', font = ('Acumin Variable concept', 17, 'bold'), bg
 background = PhotoImage(file = 'Images/background.png')
 Label(root, image = background).place(x = -2, y = 335)
 
-Label(root, text = 'Team Name', font = ('SangBleu', 30, 'bold'), bg = '#f4fdfe').place(x = 25, y = 266)
+Label(root, text = 'Connection Crew', font = ('SangBleu', 25, 'bold'), bg = '#f4fdfe').place(x = 25, y = 272)
 
 
 
