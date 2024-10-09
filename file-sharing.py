@@ -30,16 +30,35 @@ def Send():
         s = socket.socket()
         host = socket.gethostname()
         port = 8080
-        s.bind((host,port))
+        s.bind((host, port))
         s.listen(1)
-        print(host)
-        conn, addr = s.accept()
-        with open(filename, 'rb') as file:
-            file_data = file.read(1024)
-            while file_data:
-                conn.send(file_data) 
+        print(f"Host: {host}. Waiting for connection...")
+    
+        conn, addr = s.accept() 
+    
+        # Retrieve the hostname from the client's IP address
+        client_hostname = socket.gethostbyaddr(addr[0])[0]
+        client_address = f"{client_hostname}:{addr[1]}"
+    
+        allow = messagebox.askyesno("Connection Request", f"Allow connection from {client_address}?")
+    
+        if allow:
+            print(f"Connection allowed from {client_address}")
+            with open(filename, 'rb') as file:
                 file_data = file.read(1024)
-        conn.close()
+                while file_data:
+                    conn.send(file_data) 
+                    file_data = file.read(1024)
+            conn.close()
+            messagebox.showinfo("File Sent", "File sent successfully!")
+        else:
+            print("Connection denied")
+            conn.close() 
+            messagebox.showinfo("Connection Denied", "You denied the connection.")
+
+
+
+
 
 
 
