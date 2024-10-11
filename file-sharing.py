@@ -19,11 +19,20 @@ def Send():
     window.configure(bg='#f4fdfe')
     window.resizable(False, False)
 
+
     def select_file():
         global filename
         filename = filedialog.askopenfilename(initialdir=os.getcwd(),
                                                 title='Select File',
-                                                filetypes=(('file_type (.txt)', '.txt'), ('all files (.)', '.')))
+                                                filetypes=(('Text files', '.txt'), ('All files', '*.*')))
+        # Check if a file is selected
+        if filename:
+            print(f"Selected file: {filename}")  # Debugging line to check the selected file
+            file_label.config(text=os.path.basename(filename))  # Display the file name
+        else:
+            print("No file selected")  # If no file is selected
+            file_label.config(text='No file selected')
+
 
     def sender():
         global allow
@@ -34,7 +43,7 @@ def Send():
         s.listen(1)
         print(f"Host: {host}. Waiting for connection...")
 
-        conn, addr = s.accept() 
+        conn, addr = s.accept()
 
         # Retrieve the hostname from the client's IP address
         client_hostname = socket.gethostbyaddr(addr[0])[0]
@@ -59,13 +68,13 @@ def Send():
             with open(filename, 'rb') as file:
                 file_data = file.read(1024)
                 while file_data:
-                    conn.send(file_data) 
+                    conn.send(file_data)
                     file_data = file.read(1024)
             conn.close()
             messagebox.showinfo("File Sent", "File sent successfully!")
         else:
             print("Connection denied")
-            conn.close() 
+            conn.close()
             messagebox.showinfo("Connection Denied", "You denied the connection.")
 
 
@@ -83,6 +92,10 @@ def Send():
 
     Button(window, text='+ Select File', width=10, height=1, font='arial 14 bold', bg='#fff', fg='#000', command=select_file).place(x=160, y=150)
     Button(window, text='Send', width=8, height=1, font='arial 14 bold', bg='#000', fg='#fff', command=sender).place(x=300, y=150)
+
+    # Label to show the selected file name
+    file_label = Label(window, text='No file selected', fg='black', font=('arial', 20), bg='#f4fdfe', width=15)
+    file_label.place(x = 160, y = 65)
 
     window.mainloop()
 
@@ -109,7 +122,7 @@ def Receive():
             # Open a save dialog to select the file location and name
             filename1 = filedialog.asksaveasfilename(
                 defaultextension=".txt",  # Set default extension
-                filetypes=[("All files", "."), ("Text files", "*.txt")],  # Specify file types
+                filetypes=[("All files", "*.*"), ("Text files", "*.txt")],  # Specify file types
                 title="Save File As"  # Title for the dialog
             )
 
