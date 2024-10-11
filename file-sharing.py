@@ -1,16 +1,17 @@
-from tkinter import *
 import socket
+from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
 import os
 import time
-
 
 root = Tk()
 root.title('File Sharing App')
 root.geometry('450x560+500+200')
 root.configure(bg='#f4fdfe')
 root.resizable(False, False)
+
+selected_files = []  # List to hold selected files
 
 def Send():
     window = Toplevel(root)
@@ -19,23 +20,22 @@ def Send():
     window.configure(bg='#f4fdfe')
     window.resizable(False, False)
 
-
-    def select_file():
-        global filename
-        filename = filedialog.askopenfilename(initialdir=os.getcwd(),
-                                                title='Select File',
-                                                filetypes=(('Text files', '.txt'), ('All files', '*.*')))
-        # Check if a file is selected
-        if filename:
-            print(f"Selected file: {filename}")  # Debugging line to check the selected file
-            file_label.config(text=os.path.basename(filename))  # Display the file name
+    def select_files():
+        global selected_files
+        selected_files = filedialog.askopenfilenames(initialdir=os.getcwd(),
+                                                     title='Select Files',
+                                                     filetypes=(('All files', '*.*'),))
+        # Check if files are selected
+        if selected_files:
+            file_label.config(text=f"{len(selected_files)} files selected")
         else:
-            print("No file selected")  # If no file is selected
-            file_label.config(text='No file selected')
-
+            file_label.config(text='No files selected')
 
     def sender():
-        global allow
+        if not selected_files:
+            messagebox.showwarning("Warning", "No files selected!")
+            return
+
         s = socket.socket()
         host = socket.gethostname()
         port = 8080
@@ -53,30 +53,35 @@ def Send():
         while True:
             allow = messagebox.askyesno("Connection Request", f"Allow connection from {client_address}?")
             if allow:
-                # Send a confirmation to the receiver
                 conn.send("ALLOWED".encode())
                 break
             temp += 0.1
             time.sleep(0.1)
-            if temp == 15:
-                allow = False
+            if temp >= 15:
                 conn.send("DENIED".encode())
-                break
+                conn.close()
+                return
 
-        if allow:
-            print(f"Connection allowed from {client_address}")
+        print(f"Connection allowed from {client_address}")
+        conn.send(str(len(selected_files)).encode())
+        time.sleep(0.1)
+
+        for filename in selected_files:
+            conn.send(os.path.basename(filename).encode())
+            time.sleep(0.1)
+
+            file_size = os.path.getsize(filename)
+            conn.send(str(file_size).encode())
+            time.sleep(0.1)
+
             with open(filename, 'rb') as file:
                 file_data = file.read(1024)
                 while file_data:
                     conn.send(file_data)
                     file_data = file.read(1024)
-            conn.close()
-            messagebox.showinfo("File Sent", "File sent successfully!")
-        else:
-            print("Connection denied")
-            conn.close()
-            messagebox.showinfo("Connection Denied", "You denied the connection.")
 
+        conn.close()
+        messagebox.showinfo("File Sent", "Files sent successfully!")
 
     image_icon1 = PhotoImage(file='Images/send.png')
     window.iconphoto(False, image_icon1)
@@ -90,15 +95,13 @@ def Send():
     host = socket.gethostname()
     Label(window, text=f'ID: {host}', bg='white', fg='black', font='arial 15').place(x=140, y=290)
 
-    Button(window, text='+ Select File', width=10, height=1, font='arial 14 bold', bg='#fff', fg='#000', command=select_file).place(x=160, y=150)
+    Button(window, text='+ Select Files', width=15, height=1, font='arial 14 bold', bg='#fff', fg='#000', command=select_files).place(x=160, y=150)
     Button(window, text='Send', width=8, height=1, font='arial 14 bold', bg='#000', fg='#fff', command=sender).place(x=300, y=150)
 
-    # Label to show the selected file name
-    file_label = Label(window, text='No file selected', fg='black', font=('arial', 20), bg='#f4fdfe', width=15)
-    file_label.place(x = 160, y = 65)
+    file_label = Label(window, text='No files selected', fg='black', font=('arial', 15), bg='#f4fdfe')
+    file_label.place(x=160, y=65)
 
     window.mainloop()
-
 
 def Receive():
     main = Toplevel(root)
@@ -108,41 +111,53 @@ def Receive():
     main.resizable(False, False)
 
     def receiver():
-        global allow
         ID = SenderID.get()
+        if not ID:
+            messagebox.showerror("Error", "Please input sender ID!")
+            return
 
         s = socket.socket()
         port = 8080
-        s.connect((ID, port))
 
-        # Wait for the confirmation from the sender
+        try:
+            s.connect((ID, port))
+        except ConnectionRefusedError:
+            messagebox.showerror("Connection Error", "No connection could be made. Make sure the sender is active.")
+            return
+
         confirmation = s.recv(1024).decode()
 
         if confirmation == "ALLOWED":
-            # Open a save dialog to select the file location and name
-            filename1 = filedialog.asksaveasfilename(
-                defaultextension=".txt",  # Set default extension
-                filetypes=[("All files", "*.*"), ("Text files", "*.txt")],  # Specify file types
-                title="Save File As"  # Title for the dialog
-            )
+            print("Confirmation received: ALLOWED")
 
-            if not filename1:  # If the user cancels the dialog
-                s.close()
-                return
+            num_files = int(s.recv(1024).decode())
+            print(f"Number of files to receive: {num_files}")
 
-            # Proceed to receive the file
-            with open(filename1, 'wb') as file:
-                while True:
-                    file_data = s.recv(1024)
-                    if not file_data:
-                        break
-                    file.write(file_data)
-            s.close()
-            messagebox.showinfo("Success", f"File received and saved as {os.path.basename(filename1)}")
+            if num_files > 0:
+                for _ in range(num_files):
+                    file_name = s.recv(1024).decode()
+                    print(f"Receiving file: {file_name}")
+
+                    file_size = int(s.recv(1024).decode())
+                    print(f"File size: {file_size} bytes")
+
+                    download_path = os.path.join(os.path.expanduser("~"), "Downloads", file_name)
+                    with open(download_path, 'wb') as file:
+                        total_received = 0
+                        while total_received < file_size:
+                            file_data = s.recv(1024)
+                            total_received += len(file_data)
+                            file.write(file_data)
+
+                    print(f"File {file_name} received and saved to {download_path}")
+
+                messagebox.showinfo("Success", "Files received successfully!")
+            else:
+                messagebox.showinfo("No Files", "No files were sent.")
         else:
-            s.close()
-            messagebox.showinfo("Connection Denied", "File transfer was denied.")
+            messagebox.showwarning("Denied", "Connection was denied by the sender.")
 
+        s.close()
 
     image_icon2 = PhotoImage(file='Images/receive.png')
     main.iconphoto(False, image_icon2)
@@ -160,18 +175,16 @@ def Receive():
     SenderID.place(x=20, y=370)
     SenderID.focus()
 
-    rr = Button(main, text='Receive', compound=LEFT, width=13, bg='#39c790', font='arial 14 bold', command=receiver)
+    rr = Button(main, text='Receive', width=13, bg='#39c790', font='arial 14 bold', command=receiver)
     rr.place(x=20, y=500)
 
     main.mainloop()
 
-
-# Icon code
+# Main Window Setup
 image_icon = PhotoImage(file='Images/icon.png')
 root.iconphoto(False, image_icon)
 
 Label(root, text='File Sharing', font=('SangBleu', 20, 'bold'), bg='#f4fdfe').place(x=30, y=30)
-
 Frame(root, width=400, height=2, bg='#f3f5f6').place(x=25, y=80)
 
 send_image = PhotoImage(file='Images/send.png')
