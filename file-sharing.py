@@ -1,7 +1,6 @@
 import socket
 from tkinter import *
-from tkinter import filedialog
-from tkinter import messagebox
+from tkinter import filedialog, messagebox, ttk
 import os
 import time
 
@@ -25,7 +24,6 @@ def Send():
         selected_files = filedialog.askopenfilenames(initialdir=os.getcwd(),
                                                      title='Select Files',
                                                      filetypes=(('All files', '*.*'),))
-        # Check if files are selected
         if selected_files:
             file_label.config(text=f"{len(selected_files)} files selected")
         else:
@@ -44,8 +42,6 @@ def Send():
         print(f"Host: {host}. Waiting for connection...")
 
         conn, addr = s.accept()
-
-        # Retrieve the hostname from the client's IP address
         client_hostname = socket.gethostbyaddr(addr[0])[0]
         client_address = f"{client_hostname}:{addr[1]}"
 
@@ -66,6 +62,13 @@ def Send():
         conn.send(str(len(selected_files)).encode())
         time.sleep(0.1)
 
+        # Progress bar setup
+        progress = ttk.Progressbar(window, orient=HORIZONTAL, length=300, mode='determinate')
+        progress.place(x=75, y=500)
+        total_files_size = sum(os.path.getsize(file) for file in selected_files)
+        progress["maximum"] = total_files_size
+        bytes_sent = 0
+
         for filename in selected_files:
             conn.send(os.path.basename(filename).encode())
             time.sleep(0.1)
@@ -78,6 +81,9 @@ def Send():
                 file_data = file.read(1024)
                 while file_data:
                     conn.send(file_data)
+                    bytes_sent += len(file_data)
+                    progress["value"] = bytes_sent  # Update progress bar
+                    window.update_idletasks()
                     file_data = file.read(1024)
 
         conn.close()
@@ -133,20 +139,24 @@ def Receive():
             num_files = int(s.recv(1024).decode())
             print(f"Number of files to receive: {num_files}")
 
+            progress = ttk.Progressbar(main, orient=HORIZONTAL, length=300, mode='determinate')
+            progress.place(x=75, y=460)
+            total_bytes = 0
+
             if num_files > 0:
                 for _ in range(num_files):
                     file_name = s.recv(1024).decode()
-                    print(f"Receiving file: {file_name}")
-
                     file_size = int(s.recv(1024).decode())
-                    print(f"File size: {file_size} bytes")
+                    progress["maximum"] = file_size
+                    total_received = 0
 
                     download_path = os.path.join(os.path.expanduser("~"), "Downloads", file_name)
                     with open(download_path, 'wb') as file:
-                        total_received = 0
                         while total_received < file_size:
                             file_data = s.recv(1024)
                             total_received += len(file_data)
+                            progress["value"] = total_received
+                            main.update_idletasks()
                             file.write(file_data)
 
                     print(f"File {file_name} received and saved to {download_path}")
